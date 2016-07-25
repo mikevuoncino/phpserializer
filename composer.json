@@ -1,0 +1,23 @@
+{
+    "name": "mvuoncino/DateTimeWrapper",
+    "description": "",
+    "license": "MIT",
+    "keywords": ["DateTimeWrapper"],
+    "authors": [
+        {
+            "name": "Mike Vuoncino",
+            "email": "mike.vuoncino@gmail.com"
+        }
+    ],
+    "require": {
+        "psr/log" : "1.0.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "4.0.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "MVuoncino\\": "src"
+        }
+    }
+}
