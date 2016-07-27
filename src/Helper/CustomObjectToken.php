@@ -4,6 +4,13 @@ namespace MVuoncino\Helper;
 
 class CustomObjectToken extends AbstractToken
 {
+    const TOKEN = 'C';
+
+    public function getType()
+    {
+        return self::TOKEN;
+    }
+
     private $objectName;
 
     private $serialized;

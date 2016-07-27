@@ -2,7 +2,7 @@
 
 namespace MVuoncino\Helper;
 
-class ValueToken extends AbstractToken
+abstract class AbstractValueToken extends AbstractToken
 {
     private $value;
 
@@ -29,8 +29,9 @@ class ValueToken extends AbstractToken
 
     public function __toString()
     {
-        return parent::__toString() . sprintf(
-            "%s;",
+        return sprintf(
+            "%s:%s;",
+            $this->getType(),
             strval($this->value)
         );
     }

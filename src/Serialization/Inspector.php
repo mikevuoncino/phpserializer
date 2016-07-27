@@ -3,143 +3,202 @@
 namespace MVuoncino\Serialization;
 
 use MVuoncino\Exceptions\ParseException;
-use MVuoncino\Helper\TokenFactory;
+use MVuoncino\Helper\AbstractToken;
+use MVuoncino\Helper\IntegerToken;
+use MVuoncino\Helper\FloatToken;
+use MVuoncino\Helper\BooleanToken;
 use MVuoncino\Helper\NullToken;
 use MVuoncino\Helper\StringToken;
-use MVuoncino\Helper\ValueToken;
 use MVuoncino\Helper\ArrayToken;
 use MVuoncino\Helper\ObjectToken;
 use MVuoncino\Helper\CustomObjectToken;
-use Psr\Log\LoggerAwareTrait;
-use Psr\Log\LoggerTrait;
+use \SplSubject;
+use \SplObserver;
+use \SplObjectStorage;
 
-class Inspector
+class Inspector implements SplSubject
 {
-    //use LoggerAwareTrait;
-    //use LoggerTrait;
- 
-    private $factory;
+    const PARSE_ERROR = 'Could not understand character: ';
 
     private $str;
 
-    public function __construct($str, TokenFactory $factory = null)
+    private $parsed;
+
+    private $observers = [];
+
+    private $_lastToken = null;
+
+    private $_strParse;
+
+    private $_ptrParse;
+
+    public function __construct($str)
     {
+        $this->observers = new SplObjectStorage();
         $this->str = $str;
-        $this->factory = $factory;
+    }
+
+    public function attach(SplObserver $observer)
+    {
+        $this->observers->attach($observer);
+        return $this;
+    }
+   
+    public function detach(SplObserver $observer)
+    {
+        $this->observers->detach($observer);
+        return $this;
+    }
+
+    public function notify()
+    {
+        foreach ($this->observers as $observer) {
+            $observer->update($this);
+        }
     }
 
     public function parseSerializedData()
     {
-        $ptr = 0;
-        $str = $this->str; // make a copy
-        return $this->catchType($str, $ptr);
+        $this->_ptrParse = 0;
+        $this->_strParse = $this->str; // make a copy
+        $this->parsed = $this->catchType();
+        return $this->parsed;
     }
 
-    public function catchType(&$str, &$ptr)
+    public function getLastToken()
     {
-        $beginPtr = $ptr;
+        return $this->_lastToken;
+    }
 
-        $type = $this->slurp($str, $ptr, 1);
+    public function setLastToken(AbstractToken $token)
+    {
+        $this->_lastToken = $token;
+        return $this;
+    }
+
+    protected function catchType()
+    {
+        $beginPtr = $this->position();
+
+        $type = $this->slurp(1);
         
         switch ($type) {
-            case 'N': // N;
-                $this->slurp($str, $ptr, 1);
-                $caught = new NullToken();
+            case NullToken::TOKEN: // N;
+                $this->slurp(1);
+                $this->_lastToken = new NullToken();
                 break;
-            case 'b': // x:<value>;
-            case 'i':
-            case 'd':
-                $this->slurp($str, $ptr, 1);
-                $caught = $this->catchValue($str, $ptr);
+            case BooleanToken::TOKEN: // x:<value>;
+            case IntegerToken::TOKEN:
+            case FloatToken::TOKEN:
+                $this->slurp(1);
+                $this->_lastToken = $this->catchValue($type);
                 break;
-            case 's':
-                $this->slurp($str, $ptr, 1);
-                $caught = $this->catchString($str, $ptr);
+            case StringToken::TOKEN:
+                $this->slurp(1);
+                $this->_lastToken = $this->catchString();
                 break;
-            case 'a':
-                $this->slurp($str, $ptr, 1);
-                $caught = $this->catchArray($str, $ptr);
+            case ArrayToken::TOKEN:
+                $this->slurp(1);
+                $this->_lastToken = $this->catchArray();
                 break;
-            case 'C':
-                $this->slurp($str, $ptr, 1);
-                $caught = $this->catchCustomObject($str, $ptr);
+            case CustomObjectToken::TOKEN:
+                $this->slurp(1);
+                $this->_lastToken = $this->catchCustomObject();
                 break;
-            case 'O':
-                $this->slurp($str, $ptr, 1);
-                $caught = $this->catchObject($str, $ptr);
+            case ObjectToken::TOKEN:
+                $this->slurp(1);
+                $this->_lastToken = $this->catchObject();
                 break;
             default:
-                return false;
+                throw new ParseException(self::PARSE_ERROR . $type);
         }
-        $caught->setType($type);
-        $caught->setToken(substr($this->str, $beginPtr, $ptr - $beginPtr));
-        return $caught;
+        //$this->_lastToken->setType($type);
+        $this->_lastToken->setToken(substr($this->str, $beginPtr, $this->position() - $beginPtr));
+        $this->notify();
+        return $this->_lastToken;
     }
 
-    public function catchValue(&$str, &$ptr)
+    protected function catchValue($type)
     {
-        $value = $this->find($str, $ptr, ';');
-        $this->slurp($str, $ptr, 1); // ;
-        return new ValueToken($value);
+        $value = $this->find(';');
+        $this->slurp(1); // ;
+        switch ($type) {
+            case BooleanToken::TOKEN:
+                return new BooleanToken($value);
+            case IntegerToken::TOKEN:
+                return new IntegerToken($value);
+            case FloatToken::TOKEN:
+                return new FloatToken($value);
+        }
     }
 
-    public function catchLengthContent(&$str, &$ptr)
+    protected function catchLengthContent()
     {
-        $length = $this->find($str, $ptr, ':');
-        $this->slurp($str, $ptr, 2); // : and {
-        $value = $this->slurp($str, $ptr, $length);
-        $this->slurp($str, $ptr, 1); // }
+        $length = $this->find(':');
+        $this->slurp(2); // : and {
+        $value = $this->slurp($length);
+        $this->slurp(1); // }
         return $value;
     }
 
-    public function catchString(&$str, &$ptr)
+    protected function catchString()
     {
-        $length = $this->find($str, $ptr, ':');
-        $this->slurp($str, $ptr, 1); // :
-        $value = $this->slurp($str, $ptr, $length + 2); // +2 to account for double quotes 
-        $this->slurp($str, $ptr, 1); // ;
+        $length = $this->find(':');
+        $this->slurp(1); // :
+        $value = $this->slurp($length + 2); // +2 to account for double quotes 
+        $this->slurp(1); // ;
         return new StringToken(substr($value, 1, -1));
     }
 
-    public function catchArray(&$str, &$ptr)
+    protected function catchArray()
     {
-        $elements = $this->find($str, $ptr, ':');
-        $this->slurp($str, $ptr, 2); // : and {
+        $elements = $this->find(':');
+        $this->slurp(2); // : and {
         $array = new ArrayToken();
         for ($i = 0; $i < $elements; ++$i) {
             $array->addToken(
-                $this->catchType($str, $ptr),
-                $this->catchType($str, $ptr)
+                $this->catchType(),
+                $this->catchType()
             );
         }
-        $this->slurp($str, $ptr, 1);
+        $this->slurp(1);
         return $array;
     }
 
-    public function catchObject(&$str, &$ptr)
+    protected function catchObject()
     {
-        $objectName = $this->catchString($str, $ptr)->getValue();
-        $objectParsed = $this->catchArray($str, $ptr);
+        $objectName = $this->catchString()->getValue();
+        $objectParsed = $this->catchArray();
         return new ObjectToken($objectName, $objectParsed);
     }
 
-    public function catchCustomObject(&$str, &$ptr)
+    protected function catchCustomObject()
     {
-        $objectName = $this->catchString($str, $ptr)->getValue();
-        $serialized = $this->catchLengthContent($str, $ptr);
+        $objectName = $this->catchString()->getValue();
+        $serialized = $this->catchLengthContent();
         return new CustomObjectToken($objectName, $serialized);
     }
 
-    public function find(&$str, &$ptr, $char)
+    protected function position()
     {
-        return $this->slurp($str, $ptr, strpos($str, $char));
+        return $this->_ptrParse;
     }
 
-    public function slurp(&$str, &$ptr, $length)
+    protected function find($char)
     {
-        $part = substr($str, 0, $length);
-        $str = substr($str, $length);
-        $ptr += $length;
+        return $this->slurp(strpos($this->_strParse, $char));
+    }
+
+    protected function slurp($length)
+    {
+        $part = substr($this->_strParse, 0, $length);
+        $this->_strParse = substr($this->_strParse, $length);
+        $this->_ptrParse += $length;
         return $part;
+    }
+
+    public function __toString()
+    {
+        return (string)$this->parsed;
     }
 }

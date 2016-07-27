@@ -4,6 +4,7 @@ namespace MVuoncino\Helper;
 
 class ObjectToken extends AbstractToken
 {
+    const TOKEN = 'O';
     private $objectName;
 
     private $members;
@@ -12,6 +13,16 @@ class ObjectToken extends AbstractToken
     {
         $this->objectName = $objectName;
         $this->members = $members;
+    }
+
+    public function getType()
+    {
+        return self::TOKEN;
+    }
+
+    public function setMember($i, AbstractToken $key, AbstractToken $value)
+    {
+        return $this->members->setMember($i, $key, $value);
     }
 
     public function toArray()

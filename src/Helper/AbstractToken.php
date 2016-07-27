@@ -6,8 +6,6 @@ abstract class AbstractToken
 {
     private $token;
 
-    private $type;
-
     public function setToken($token)
     {
         $this->token = $token;
@@ -19,22 +17,10 @@ abstract class AbstractToken
         return $this->token;
     }
 
-    public function setType($type)
-    {
-        $this->type = $type;
-        return $this;
-    }
+    abstract public function getType();
 
-    final public function getType()
-    {
-        return $this->type;
-    }
+    abstract public function toArray();
 
-    abstract function toArray();
-
-    public function __toString()
-    {
-        return sprintf("%s:", $this->type);
-    }
+    abstract public function __toString();
 }
 

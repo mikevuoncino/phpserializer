@@ -2,8 +2,15 @@
 
 namespace MVuoncino\Helper;
 
-class StringToken extends ValueToken
+class StringToken extends AbstractValueToken
 {
+    const TOKEN = 's';
+
+    public function getType()
+    {
+        return self::TOKEN;
+    }
+
     public function __toString()
     {
         return sprintf(

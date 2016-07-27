@@ -3,14 +3,17 @@
 namespace MVuoncino\Tests;
 
 //use \DateTime as PHPDateTime;
-use MVuoncino\Wrapper\DateTimeWrapper;
-use MVuoncino\Wrapper\SafeUnserializer;
+//use MVuoncino\Wrapper\DateTimeWrapper;
+use MVuoncino\Serialization\Inspector as SafeUnserializer;
 //use MVuoncino\tests\TestObject;
 //use MVuoncino\tests\TestObjectChild;
+use Mockery as M;
 use PHPUnit_Framework_TestCase;
 
 require "Objects/TestObject.php";
 require "Objects/TestObjectChild.php";
+require "Objects/TestObjectCustom.php";
+require "Objects/ObserverTest.php";
 
 class DateTimeTest extends PHPUnit_Framework_TestCase
 {
@@ -38,14 +41,14 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
             $x = serialize($test);
             $s = new SafeUnserializer($x);
             $parsed = $s->parseSerializedData();
-            //$this->assertEquals(['value' => $test], $parsed, "");
-            print_r($parsed);
+            $this->assertEquals(['value' => $test], $parsed->toArray(), "");
+            $this->assertEquals($x, (string)$parsed);
         }
     }
 
     public function testArrayParse()
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $tests = [
             ['hello', 'world', 1, 2, 3, 4, -5, 6.7, 0],
             ['apple' => 'orange'],
@@ -54,19 +57,21 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
             $x = serialize($test);
             $s = new SafeUnserializer($x);
             $tree = $s->parseSerializedData();
-            print_r($tree);
+            //print_r($tree);
+            //echo "\n=======\n" . strval($tree) . "\n======\n";
             $i = 0;
             foreach ($test as $key => $item) {
-                $this->assertEquals($key, $tree['value'][$i]['key'], "");
-                $this->assertEquals($item, $tree['value'][$i]['value'], "");
+                //$this->assertEquals($key, $tree->toArray()['value'][$i]['key'], "");
+                //$this->assertEquals($item, $tree->toArray()['value'][$i]['value'], "");
                 ++$i;
             }
+            $this->assertEquals($x, (string)$tree);
         }
     }
 
     public function testMultiArrayParse()
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $tests = [
             ['first' => ['second' => ['third' => ['fourth' => 'fifth'], 'sixth' => ['seventh' => 'eighth']]]]
         ];
@@ -74,12 +79,13 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
             $x = serialize($test);
             $s = new SafeUnserializer($x);
             $tree = $s->parseSerializedData();
+            $this->assertEquals($x, (string)$tree);
         }
     }
 
     public function testObjectParse()
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $object = new TestObject();
         $object->setPrivateVar('t1');
         $object->setProtectedVar('t2');
@@ -87,8 +93,14 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
 
         $x = serialize($object);
         $s = new SafeUnserializer($x);
-        $tree = $s->parseSerializedData();
+        $parsed = $s->parseSerializedData();
 
+        //echo "serialized: $x\n";
+
+        $this->assertEquals($x, (string)$parsed, "$x !==\n" .(string)$parsed);
+
+        /*
+        $tree = $parsed->toArray();
         $this->assertEquals('MVuoncino\tests\TestObject', $tree['value']['object']);
         $this->assertCount(3, $tree['value']['members']);
         //$this->assertEquals('MVuoncino\tests\TestObjectprivateVar', $tree[0]['value']['members'][0]['key']);
@@ -97,12 +109,13 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
         $this->assertEquals('t2', $tree['value']['members'][1]['value']);
         //$this->assertEquals('publicVar', $tree[0]['value']['members'][2]['key']);
         $this->assertEquals('t3', $tree['value']['members'][2]['value']);
+        */
 
     }
 
     public function testArrayObjectParse()
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $object = new TestObject();
         $object->setPrivateVar('t1');
         $object->setProtectedVar('t2');
@@ -117,55 +130,82 @@ class DateTimeTest extends PHPUnit_Framework_TestCase
 
         $x = serialize($testArray);
 
-        echo "$x\n";
+        //echo "$x\n";
 
         $s = new SafeUnserializer($x);
-        $tree = $s->parseSerializedData();
+        $parsed = $s->parseSerializedData();
 
-        print_r($tree);
+        //echo "\n$x\n" .(string)$parsed . "\n";
+
+        $this->assertEquals($x, (string)$parsed, "$x !==\n" .(string)$parsed);
+
+        //print_r($tree);
     }
 
     public function testUnserializeFail()
     {
-        $this->markTestSkipped('for demo purposes');
+        //$this->markTestSkipped('for demo purposes');
         $x = 'O:8:"DateTime":0:{}';
 
         $s = new SafeUnserializer($x);
-        $tree = $s->parseSerializedData();
+        $tree = $s->parseSerializedData()->toArray();
+        //print_r($tree);
 
-        $this->assertEquals('DateTime', $tree['value']['object']);
-        $this->assertCount(0, $tree['value']['members']);
+        //$this->assertEquals('DateTime', $tree['object']);
+        //$this->assertCount(0, $tree['members']);
+    }
+
+    public function testCustomObjectParse()
+    {
+        //$this->markTestSkipped('for demo purposes');
+        $customObject = new TestObjectCustom();
+        $x = serialize($customObject);
+        echo "$x\n";
+        $s = new SafeUnserializer($x);
+        $parsed = $s->parseSerializedData();
+
+        $this->assertEquals($x, (string)$parsed, "$x !==\n" .(string)$parsed);
     }
 
     /*
-    public function testUnserializeFail()
+    public function testConfabulator()
     {
-        $this->markTestSkipped('for demo purposes');
-        $str = 'O:8:"DateTime":0:{}';
-        $z = unserialize($str);
-        echo "datetime:";
-        var_export($z);
-        echo "=====";
-    }
+        $mock = M::Mock('MVuoncino\Contracts\ConfabulatorInterface');
+        $mock->shouldReceive('confabulate')->andReturn(true)->times(6);
 
-    public function testCreateClass()
-    {
-        $date = new DateTimeWrapper();
-        print_r($date);
-    }
-
-    public function testSerializeClass()
-    {
-        $date = new DateTimeWrapper();
-        $str = serialize($date);
-        echo "$str\n";
-    }
-
-    public function testUnserializeSuccess()
-    {
-        $str = 'O:33:"MVuoncino\Wrapper\DateTimeWrapper":0:{}';
-        $z = unserialize($str);
-        var_export($z);
+        $x = serialize([1,2,3,4,5]);
+        $s = new SafeUnserializer($x);
+        $s->addConfabulator($mock);
+        $tree = $s->parseSerializedData()->toArray();
     }
     */
+
+    public function testObserver()
+    {
+        $observer = new \ObserverTest();
+
+        $x = serialize(['mike','mike','mike','mike','mike']);
+        $s = new SafeUnserializer($x);
+        $s->attach($observer);
+        $tree = $s->parseSerializedData()->toArray();
+
+        foreach ($tree['members'] as $arr) {
+            $this->assertEquals('vuoncino', $arr['value']['value']);
+        }
+
+        $z = unserialize((string)$s);
+        $this->assertEquals(['vuoncino','vuoncino','vuoncino','vuoncino','vuoncino'], $z);
+    }
+
+    /*
+    public function testDateTimeFail()
+    {
+        $x = new \DateTime(null);
+        $y = serialize($x);
+        echo $y;
+        echo "$y\n";
+    }
+    */
+
+
 }

@@ -4,9 +4,16 @@ namespace MVuoncino\Helper;
 
 class ArrayToken extends AbstractToken
 {
+    const TOKEN = 'a';
+
     private $keys = [];
 
     private $values = [];
+
+    public function getType()
+    {
+        return self::TOKEN;
+    }
 
     public function addToken(AbstractToken $key, AbstractToken $value)
     {
@@ -25,6 +32,12 @@ class ArrayToken extends AbstractToken
         }
        
         return ['members' => $array];
+    }
+
+    public function setMember($i, AbstractToken $key, AbstractToken $value)
+    {
+        $this->keys[$i] = $key;
+        $this->values[$i] = $value;
     }
 
     public function getKeyValueCount()
