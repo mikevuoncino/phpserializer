@@ -6,21 +6,37 @@ class CustomObjectToken extends AbstractToken
 {
     const TOKEN = 'C';
 
-    public function getType()
-    {
-        return self::TOKEN;
-    }
-
+    /**
+     * @var string
+     */
     private $objectName;
 
+    /**
+     * @var string 
+     */
     private $serialized;
-
+    
+    /**
+     * @param string $objectName
+     * @param string $serialized
+     */
     public function __construct($objectName, $serialized)
     {
         $this->objectName = $objectName;
         $this->serialized = $serialized;
     }
+    
+    /**
+     * @return string
+     */
+    public function getType()
+    {
+        return self::TOKEN;
+    }
 
+    /**
+     * @return array
+     */
     public function toArray()
     {
         return [
@@ -29,6 +45,9 @@ class CustomObjectToken extends AbstractToken
         ];
     }
 
+    /**
+     * @return string
+     */
     public function __toString()
     {
         return sprintf(

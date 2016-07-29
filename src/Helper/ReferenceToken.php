@@ -2,9 +2,9 @@
 
 namespace MVuoncino\Helper;
 
-class BooleanToken extends AbstractValueToken
+class ReferenceToken extends AbstractValueToken
 {
-    const TOKEN = 'b';
+    const TOKEN = 'R';
 
     /**
      * @return string

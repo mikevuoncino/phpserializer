@@ -7,6 +7,7 @@ use MVuoncino\Helper\AbstractToken;
 use MVuoncino\Helper\IntegerToken;
 use MVuoncino\Helper\FloatToken;
 use MVuoncino\Helper\BooleanToken;
+use MVuoncino\Helper\ReferenceToken;
 use MVuoncino\Helper\NullToken;
 use MVuoncino\Helper\StringToken;
 use MVuoncino\Helper\ArrayToken;
@@ -20,36 +21,68 @@ class Inspector implements SplSubject
 {
     const PARSE_ERROR = 'Could not understand character: ';
 
+    /**
+     * @var string
+     */
     private $str;
 
+    /**
+     * @var string
+     */
     private $parsed;
 
-    private $observers = [];
+    /**
+     * @var SplObjectStorage
+     */
+    private $observers;
 
+    /**
+     * @var AbstractToken
+     */
     private $_lastToken = null;
 
+    /**
+     * @var string
+     */
     private $_strParse;
 
+    /**
+     * @var int
+     */
     private $_ptrParse;
 
+    /**
+     * @param string $str
+     */
     public function __construct($str)
     {
         $this->observers = new SplObjectStorage();
         $this->str = $str;
     }
 
+    /**
+     * @param SplObserver $observer
+     * @return self
+     */
     public function attach(SplObserver $observer)
     {
         $this->observers->attach($observer);
         return $this;
     }
    
+    /**
+     * @param SplObserver $observer
+     * @return self
+     */
     public function detach(SplObserver $observer)
     {
         $this->observers->detach($observer);
         return $this;
     }
 
+    /**
+     * 
+     */
     public function notify()
     {
         foreach ($this->observers as $observer) {
@@ -57,6 +90,9 @@ class Inspector implements SplSubject
         }
     }
 
+    /**
+     * @return AbstractToken
+     */
     public function parseSerializedData()
     {
         $this->_ptrParse = 0;
@@ -65,17 +101,28 @@ class Inspector implements SplSubject
         return $this->parsed;
     }
 
+    /**
+     * @return AbstractToken
+     */
     public function getLastToken()
     {
         return $this->_lastToken;
     }
 
+    /**
+     * @param AbstractToken $token
+     * @return self
+     */
     public function setLastToken(AbstractToken $token)
     {
         $this->_lastToken = $token;
         return $this;
     }
 
+    /**
+     * @return AbstractToken
+     * @throws ParseException
+     */
     protected function catchType()
     {
         $beginPtr = $this->position();
@@ -90,6 +137,7 @@ class Inspector implements SplSubject
             case BooleanToken::TOKEN: // x:<value>;
             case IntegerToken::TOKEN:
             case FloatToken::TOKEN:
+            case ReferenceToken::TOKEN:
                 $this->slurp(1);
                 $this->_lastToken = $this->catchValue($type);
                 break;
@@ -118,6 +166,10 @@ class Inspector implements SplSubject
         return $this->_lastToken;
     }
 
+    /**
+     * @param string $type
+     * @return FloatToken|BooleanToken|IntegerToken
+     */
     protected function catchValue($type)
     {
         $value = $this->find(';');
@@ -129,9 +181,14 @@ class Inspector implements SplSubject
                 return new IntegerToken($value);
             case FloatToken::TOKEN:
                 return new FloatToken($value);
+            case ReferenceToken::TOKEN:
+                return new ReferencetToken($value);
         }
     }
 
+    /**
+     * @return string
+     */
     protected function catchLengthContent()
     {
         $length = $this->find(':');
@@ -141,6 +198,9 @@ class Inspector implements SplSubject
         return $value;
     }
 
+    /**
+     * @return StringToken
+     */
     protected function catchString()
     {
         $length = $this->find(':');
@@ -150,6 +210,9 @@ class Inspector implements SplSubject
         return new StringToken(substr($value, 1, -1));
     }
 
+    /**
+     * @return ArrayToken
+     */
     protected function catchArray()
     {
         $elements = $this->find(':');
@@ -165,6 +228,9 @@ class Inspector implements SplSubject
         return $array;
     }
 
+    /**
+     * @return ObjectToken
+     */
     protected function catchObject()
     {
         $objectName = $this->catchString()->getValue();
@@ -172,6 +238,9 @@ class Inspector implements SplSubject
         return new ObjectToken($objectName, $objectParsed);
     }
 
+    /**
+     * @return CustomObjectToken
+     */
     protected function catchCustomObject()
     {
         $objectName = $this->catchString()->getValue();
@@ -179,16 +248,27 @@ class Inspector implements SplSubject
         return new CustomObjectToken($objectName, $serialized);
     }
 
+    /**
+     * @return int
+     */
     protected function position()
     {
         return $this->_ptrParse;
     }
 
+    /**
+     * @param string $char
+     * @return string
+     */
     protected function find($char)
     {
         return $this->slurp(strpos($this->_strParse, $char));
     }
 
+    /**
+     * @param int $length
+     * @return string
+     */
     protected function slurp($length)
     {
         $part = substr($this->_strParse, 0, $length);
@@ -197,6 +277,9 @@ class Inspector implements SplSubject
         return $part;
     }
 
+    /**
+     * @return string
+     */
     public function __toString()
     {
         return (string)$this->parsed;
